@@ -50,5 +50,4 @@ impl<A: Default, B: Copy> Node<A, B> {
     pub fn pad_empty(self, ctx: &mut Ctx) -> Self {
         todo!()
     }
-
 }
