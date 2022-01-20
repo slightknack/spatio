@@ -1,7 +1,9 @@
 mod quad;
 mod ctx;
 mod step;
+mod render;
 
 fn main() {
-    println!("Hello, world!");
+    println!("Warming up...");
+    render::run();
 }

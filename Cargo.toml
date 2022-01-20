@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 tch = "0.6.1"
+vulkano = "0.27"
