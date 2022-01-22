@@ -5,5 +5,6 @@ mod render;
 
 fn main() {
     println!("Warming up...");
-    render::run();
+    render::graphics();
+    println!("Hello!");
 }
