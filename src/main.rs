@@ -17,7 +17,7 @@ fn main() {
         &mut ctx, base,
     );
 
-    // render::graphics();
-
     println!("{:#?}", quad);
+
+    // render::graphics();
 }

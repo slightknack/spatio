@@ -1,4 +1,5 @@
 use miniquad::*;
+use crate::quad::{Node, Embed};
 
 #[repr(C)]
 struct Vec2 {
@@ -11,14 +12,17 @@ struct Vertex {
     uv: Vec2,
 }
 
-struct Stage {
+struct Stage<A: Embed, B: Embed> {
     pipeline: Pipeline,
     bindings: Bindings,
     texture:  Texture,
+    node:     Node<A, B>,
 }
 
-impl Stage {
-    pub fn new(ctx: &mut Context) -> Stage {
+const SIZE: usize = 4;
+
+impl<A: Embed, B: Embed> Stage<A, B> {
+    pub fn new(ctx: &mut Context) -> Self {
         #[rustfmt::skip]
         let vertices: [Vertex; 4] = [
             Vertex { pos : Vec2 { x: -1., y: -1. }, uv: Vec2 { x: 0., y: 0. } },
@@ -31,8 +35,8 @@ impl Stage {
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
         let index_buffer = Buffer::immutable(ctx, BufferType::IndexBuffer, &indices);
 
-        let pixels: [u8; 512*512*4] = [0x77; 512*512*4];
-        let texture = Texture::from_rgba8(ctx, 512, 512, &pixels);
+        let pixels: [u8; SIZE*SIZE*4] = [0x77; SIZE*SIZE*4];
+        let texture = Texture::from_rgba8(ctx, SIZE as u16, SIZE as u16, &pixels);
 
         let bindings = Bindings {
             vertex_buffers: vec![vertex_buffer],
@@ -52,15 +56,16 @@ impl Stage {
             shader,
         );
 
-        Stage { pipeline, bindings, texture }
+        Stage { pipeline, bindings, texture, node: todo!() }
     }
 }
 
-impl EventHandler for Stage {
+impl<A: Embed, B: Embed> EventHandler for Stage<A, B> {
     fn update(&mut self, ctx: &mut Context) {
         let t = date::now();
         let bright = t.sin()*0.5+0.5;
-        let bytes = [(bright * 255.0) as u8; 512*512*4];
+        let bytes = [(bright * 255.0) as u8; SIZE*SIZE*4];
+
         self.texture.update(ctx, &bytes)
     }
 
@@ -79,9 +84,10 @@ impl EventHandler for Stage {
 }
 
 pub fn graphics() {
-    miniquad::start(conf::Conf::default(), |mut ctx| {
-        UserData::owning(Stage::new(&mut ctx), ctx)
-    });
+    // assert_eq!((2 as usize).pow(node.depth as u32), SIZE);
+    // miniquad::start(conf::Conf::default(), move |mut ctx| {
+    //     UserData::owning(Stage::new(&mut ctx), ctx)
+    // });
 }
 
 mod shader {
