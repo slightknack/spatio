@@ -14,6 +14,7 @@ pub enum Quad<A: Default, B: Copy> {
 
 /// Represends a node in a quadtree.
 /// Has a depth denoting the number of nodes below it.
+/// The base node has a depth of 0
 /// Nodes should only be siblings of nodes with the same depth.
 /// Data stored inside a quadtree node, including children, are in `data`.
 pub struct Node<A: Default, B: Copy> {
@@ -23,6 +24,42 @@ pub struct Node<A: Default, B: Copy> {
 }
 
 impl<A: Default, B: Copy> Node<A, B> {
+    /// Bytes must be of size (2**depth)**2 * 4
+    pub fn write_rgba8(
+        self,
+        ctx: &mut Ctx,
+        bytes: &mut [u8],
+        depth: usize,
+        x: usize,
+        y: usize,
+    ) -> Self {
+        let mut expanded = ctx.expand(self);
+        expanded.data = match expanded.data {
+            // Base cell in grid.
+            Quad::Base(base) => {
+                let mut color = ctx.color_base(&base);
+                let idx = ((1 << depth) * y + x) * 4;
+                bytes[idx..(idx + 4)].swap_with_slice(&mut color);
+                Quad::Base(base)
+            },
+            // Node with 4 children.
+            Quad::Node(children) => {
+                let size = 1 << expanded.depth;
+                let half = size / 2;
+                let c = [
+                    children[0].write_rgba8(ctx, bytes, depth, x,        y       ),
+                    children[1].write_rgba8(ctx, bytes, depth, x + half, y       ),
+                    children[2].write_rgba8(ctx, bytes, depth, x,        y + half),
+                    children[3].write_rgba8(ctx, bytes, depth, x + half, y + half),
+                ];
+                todo!()
+            },
+            // Children may be generated from Node.
+            Cached => { unreachable!(); },
+        };
+        expanded
+    }
+
     /// Creates a new tree from a single base node
     pub fn new_base(base: A, ctx: &mut Ctx) -> Self {
         Node {

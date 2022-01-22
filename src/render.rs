@@ -14,6 +14,7 @@ struct Vertex {
 struct Stage {
     pipeline: Pipeline,
     bindings: Bindings,
+    texture:  Texture,
 }
 
 impl Stage {
@@ -51,12 +52,17 @@ impl Stage {
             shader,
         );
 
-        Stage { pipeline, bindings }
+        Stage { pipeline, bindings, texture }
     }
 }
 
 impl EventHandler for Stage {
-    fn update(&mut self, _ctx: &mut Context) {}
+    fn update(&mut self, ctx: &mut Context) {
+        let t = date::now();
+        let bright = t.sin()*0.5+0.5;
+        let bytes = [(bright * 255.0) as u8; 512*512*4];
+        self.texture.update(ctx, &bytes)
+    }
 
     fn draw(&mut self, ctx: &mut Context) {
         ctx.begin_default_pass(Default::default());

@@ -20,6 +20,10 @@ impl Ctx {
         todo!("Turn Base Cell into a vector B");
     }
 
+    pub fn color_base<A>(&mut self, base: &A) -> [u8; 4] {
+        todo!();
+    }
+
     /// Compresses a single node into a vector representation.
     /// Returns `None` if node has already been compressed and trimmed from tree.
     /// To recover a trimmed node, use `expand` on the compressed representation.
