@@ -1,7 +1,7 @@
 use crate::ctx::Ctx;
-use crate::quad::Node;
+use crate::quad::{Node, Embed};
 
-pub fn step<A: Default, B: Copy>(ctx: &mut Ctx, node: Node<A, B>) -> Node<A, B> {
+pub fn step<A: Embed, B: Embed>(ctx: &mut Ctx<A, B>, node: Node<A, B>) -> Node<A, B> {
     // pad the graph if needed.
 
     // if we're at the base, run the cellular automation rule:

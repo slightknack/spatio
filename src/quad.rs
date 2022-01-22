@@ -1,8 +1,13 @@
 use crate::ctx::Ctx;
 
+pub trait Embed: Default + Copy + Sized + std::fmt::Debug {
+    
+}
+
 /// Represents the data present in a quad-tree node.
 /// May be the base-level repr, or a node with 4 children.
-pub enum Quad<A: Default, B: Copy> {
+#[derive(Debug)]
+pub enum Quad<A: Embed, B: Embed> {
     /// Base cell in grid.
     /// May actually be a chunk of cells for performance.
     Base(A),
@@ -12,66 +17,67 @@ pub enum Quad<A: Default, B: Copy> {
     Cached,
 }
 
+impl Embed for u8 {}
+
 /// Represends a node in a quadtree.
 /// Has a depth denoting the number of nodes below it.
 /// The base node has a depth of 0
 /// Nodes should only be siblings of nodes with the same depth.
 /// Data stored inside a quadtree node, including children, are in `data`.
-pub struct Node<A: Default, B: Copy> {
+#[derive(Debug)]
+pub struct Node<A: Embed, B: Embed> {
     pub depth: usize,
     pub compr: B,
     pub data:  Quad<A, B>,
 }
 
-impl<A: Default, B: Copy> Node<A, B> {
-    /// Bytes must be of size (2**depth)**2 * 4
-    pub fn write_rgba8(
-        self,
-        ctx: &mut Ctx,
-        bytes: &mut [u8],
-        depth: usize,
-        x: usize,
-        y: usize,
-    ) -> Self {
-        let mut expanded = ctx.expand(self);
-        expanded.data = match expanded.data {
-            // Base cell in grid.
-            Quad::Base(base) => {
-                let mut color = ctx.color_base(&base);
-                let idx = ((1 << depth) * y + x) * 4;
-                bytes[idx..(idx + 4)].swap_with_slice(&mut color);
-                Quad::Base(base)
+impl<A: Embed, B: Embed> Node<A, B> {
+    pub fn sample_color(self, ctx: &mut Ctx<A, B>, x: isize, y: isize) -> (Self, [u8; 4]) {
+        // self = ctx.expand(self);
+        // if let Quad::Base(b) = self.data {
+        //     return (self, ctx.color_base(&b));
+        // }
+
+        let child_size = 1 << (self.depth - 1);
+        let nx = (x + child_size) % child_size;
+        let ny = (y + child_size) % child_size;
+
+        match (x >= 0, y >= 0) {
+            (true, true) => {
+                let x = x;
             },
-            // Node with 4 children.
-            Quad::Node(children) => {
-                let size = 1 << expanded.depth;
-                let half = size / 2;
-                let c = [
-                    children[0].write_rgba8(ctx, bytes, depth, x,        y       ),
-                    children[1].write_rgba8(ctx, bytes, depth, x + half, y       ),
-                    children[2].write_rgba8(ctx, bytes, depth, x,        y + half),
-                    children[3].write_rgba8(ctx, bytes, depth, x + half, y + half),
-                ];
-                todo!()
-            },
-            // Children may be generated from Node.
-            Cached => { unreachable!(); },
-        };
-        expanded
+            _ => { unreachable!(); }
+        }
+
+        // self
+        todo!()
+    }
+
+    /// Creates a new tree with a single empty base node
+    pub fn new_empty(ctx: &mut Ctx<A, B>) -> Self {
+        Self::new_base(ctx, Default::default())
     }
 
     /// Creates a new tree from a single base node
-    pub fn new_base(base: A, ctx: &mut Ctx) -> Self {
+    pub fn new_base(ctx: &mut Ctx<A, B>, base: A) -> Self {
         Node {
             depth: 0,
-            compr: ctx.compress_base(&base),
+            compr: ctx.compress_base(base),
             data:  Quad::Base(base),
         }
     }
 
-    /// Creates a new tree with a single empty base node
-    pub fn new_empty(ctx: &mut Ctx) -> Self {
-        Self::new_base(Default::default(), ctx)
+    pub fn new_node(ctx: &mut Ctx<A, B>, children: [Node<A, B>;4]) -> Self {
+        // Make sure the depths check out
+        assert_eq!(children[0].depth, children[1].depth);
+        assert_eq!(children[1].depth, children[2].depth);
+        assert_eq!(children[2].depth, children[3].depth);
+        let depth = children[0].depth + 1;
+
+        // compress and build the node
+        let quad = Quad::Node(Box::new(children));
+        let compr = ctx.compress(&quad).unwrap();
+        Node { depth, compr, data: quad }
     }
 
     pub fn new_cached(compr: B, depth: usize) -> Self {
@@ -82,9 +88,54 @@ impl<A: Default, B: Copy> Node<A, B> {
         }
     }
 
+    fn build_square(
+        ctx: &mut Ctx<A, B>,
+        square: &[A],
+        abs_size: usize,
+        depth: usize,
+        x: isize,
+        y: isize,
+    ) -> Node<A, B> {
+        if depth == 0 {
+            let abs_x = (x + (abs_size / 2) as isize) as usize;
+            let abs_y = (y + (abs_size / 2) as isize) as usize;
+            let idx = abs_y * abs_size + abs_x;
+            Self::new_base(ctx, square[idx])
+        } else {
+            let size = 1 << depth;
+            let half = size / 2;
+            // in a z-like pattern
+            let children = [
+                Self::build_square(ctx, square, abs_size, depth - 1, x + half, y       ),
+                Self::build_square(ctx, square, abs_size, depth - 1, x       , y       ),
+                Self::build_square(ctx, square, abs_size, depth - 1, x + half, y + half),
+                Self::build_square(ctx, square, abs_size, depth - 1, x       , y + half),
+            ];
+            Self::new_node(ctx, children)
+        }
+    }
+
+    pub fn new_from_square(ctx: &mut Ctx<A, B>, square: Vec<A>) -> Self {
+        // get the side length, ensure this is a pow2 square
+        let area = square.len();
+        let size = ((area as f64).sqrt() + 0.5) as usize;
+        dbg!(size);
+        assert!(size.is_power_of_two());
+        assert!(size * size == area);
+
+        // Takes the log2 of the number
+        // Power of two, so `size - 1` is all ones
+        let depth: usize = (size - 1).trailing_ones() as usize;
+        let half = (size / 2) as isize;
+
+        // Start in lower-left corner (half, half),
+        // build up and out recursively
+        Self::build_square(ctx, &square, size, depth, -half, -half)
+    }
+
     /// Creates a new node double the size by centering the current node
     /// on a node double the size.
-    pub fn pad_empty(self, ctx: &mut Ctx) -> Self {
+    pub fn pad_empty(self, ctx: &mut Ctx<A, B>) -> Self {
         todo!()
     }
 }

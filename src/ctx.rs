@@ -1,35 +1,40 @@
-use crate::quad::{Quad, Node};
+use std::marker::PhantomData;
+use crate::quad::{Quad, Node, Embed};
 
 /// Represents a context with shared state.
-pub struct Ctx();
+#[derive(Default, Debug)]
+pub struct Ctx<A: Embed, B: Embed> {
+    _phantom_a: PhantomData<A>,
+    _phantom_b: PhantomData<B>,
+}
 
-impl Ctx {
+impl<A: Embed, B: Embed> Ctx<A, B> {
     /// Creates a new uninitialized context.
     pub fn new_empty() -> Self {
-        Ctx()
+        Default::default()
     }
 
     /// Combines 4 child node representations into a single representation
     /// Using a neural network.
-    pub fn combine<B>(&mut self, compr: [B; 4]) -> B {
+    pub fn combine(&mut self, compr: [B; 4]) -> B {
         todo!("Build new B from 4 child B");
     }
 
     /// Compresses a base-level cell into a vector.
-    pub fn compress_base<A, B>(&mut self, base: A) -> B {
+    pub fn compress_base(&mut self, base: A) -> B {
         todo!("Turn Base Cell into a vector B");
     }
 
-    pub fn color_base<A>(&mut self, base: &A) -> [u8; 4] {
+    pub fn color_base(&mut self, base: &A) -> [u8; 4] {
         todo!();
     }
 
     /// Compresses a single node into a vector representation.
     /// Returns `None` if node has already been compressed and trimmed from tree.
     /// To recover a trimmed node, use `expand` on the compressed representation.
-    pub fn compress<A: Default, B: Copy>(&mut self, quad: &Quad<A, B>) -> Option<B> {
+    pub fn compress(&mut self, quad: &Quad<A, B>) -> Option<B> {
         match quad {
-            Quad::Base(b) => Some(self.compress_base(b)),
+            Quad::Base(b) => Some(self.compress_base(*b)),
             Quad::Node(n) => Some(
                 self.combine([
                     n[0].compr,
@@ -43,16 +48,16 @@ impl Ctx {
     }
 
     /// Compresses a base-level cell into a vector.
-    fn expand_base<A: Default, B: Copy>(&mut self, compr: B) -> A {
+    fn expand_base(&mut self, compr: B) -> A {
         todo!("Turn compressed B into the A that made it");
     }
 
-    fn expand_node<B>(&mut self, compr: B) -> [B; 4] {
+    fn expand_node(&mut self, compr: B) -> [B; 4] {
         todo!("Turn compressed B into 4 child B that made it");
     }
 
     /// Expands the compressed representation of a node into a node with 4 children.
-    pub fn expand<A: Default, B: Copy>(&mut self, mut compr: Node<A, B>) -> Node<A, B> {
+    pub fn expand(&mut self, mut compr: Node<A, B>) -> Node<A, B> {
         match compr.data {
             // Can't expand a base node.
             Quad::Base(_) => {
