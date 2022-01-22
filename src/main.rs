@@ -13,11 +13,20 @@ fn main() {
         base.push(i);
     }
 
-    let quad: quad::Node<u8, u8> = quad::Node::new_from_square(
+    let mut quad: quad::Node<u8, u8> = quad::Node::new_from_square(
         &mut ctx, base,
     );
 
     println!("{:#?}", quad);
+
+    // TODO: this does not work correctly
+    // for x in -2..2 {
+    //     for y in -2..2 {
+    //         let (nquad, color) = quad.sample_color(&mut ctx, x, y);
+    //         quad = nquad;
+    //         println!("{}", color[0]);
+    //     }
+    // }
 
     // render::graphics();
 }

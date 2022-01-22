@@ -32,30 +32,34 @@ pub struct Node<A: Embed, B: Embed> {
 }
 
 impl<A: Embed, B: Embed> Node<A, B> {
+    // TODO: this function does not work correctly
     pub fn sample_color<S, N: Approx<A, B, S>>(
         self,
         ctx: &mut Ctx<A, B, S, N>,
         x: isize,
         y: isize,
     ) -> (Self, [u8; 4]) {
-        // self = ctx.expand(self);
-        // if let Quad::Base(b) = self.data {
-        //     return (self, ctx.color_base(&b));
-        // }
+        let mut expanded = ctx.expand(self);
+        match expanded.data {
+            Quad::Base(a) => (expanded, ctx.color_base(a)),
+            Quad::Node(ref mut n) => {
+                let depth = expanded.depth;
+                let half = 1 << (depth - 1);
+                let (c, nx, ny) = match (x >= 0, y >= 0) {
+                    (true  ,  true) => (1, x - half, y - half),
+                    (true  , false) => (3, x - half, y + half),
+                    (false ,  true) => (0, x + half, y - half),
+                    (false , false) => (2, x + half, y + half),
+                };
 
-        let child_size = 1 << (self.depth - 1);
-        let nx = (x + child_size) % child_size;
-        let ny = (y + child_size) % child_size;
+                let oc = std::mem::replace(&mut n[c], Self::new_empty(ctx));
+                let (nc, color) = oc.sample_color(ctx, nx, ny);
+                n[c] = nc;
 
-        match (x >= 0, y >= 0) {
-            (true, true) => {
-                let x = x;
+                (expanded, color)
             },
-            _ => { unreachable!(); }
+            Quad::Cached => unreachable!("Expanded this node!"),
         }
-
-        // self
-        todo!()
     }
 
     /// Creates a new tree with a single empty base node
