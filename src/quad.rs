@@ -1,7 +1,7 @@
-use crate::ctx::Ctx;
+use crate::ctx::{Ctx, Approx};
 
 pub trait Embed: Default + Copy + Sized + std::fmt::Debug {
-    
+
 }
 
 /// Represents the data present in a quad-tree node.
@@ -32,7 +32,12 @@ pub struct Node<A: Embed, B: Embed> {
 }
 
 impl<A: Embed, B: Embed> Node<A, B> {
-    pub fn sample_color(self, ctx: &mut Ctx<A, B>, x: isize, y: isize) -> (Self, [u8; 4]) {
+    pub fn sample_color<S, N: Approx<A, B, S>>(
+        self,
+        ctx: &mut Ctx<A, B, S, N>,
+        x: isize,
+        y: isize,
+    ) -> (Self, [u8; 4]) {
         // self = ctx.expand(self);
         // if let Quad::Base(b) = self.data {
         //     return (self, ctx.color_base(&b));
@@ -54,12 +59,12 @@ impl<A: Embed, B: Embed> Node<A, B> {
     }
 
     /// Creates a new tree with a single empty base node
-    pub fn new_empty(ctx: &mut Ctx<A, B>) -> Self {
+    pub fn new_empty<S, N: Approx<A, B, S>>(ctx: &mut Ctx<A, B, S, N>) -> Self {
         Self::new_base(ctx, Default::default())
     }
 
     /// Creates a new tree from a single base node
-    pub fn new_base(ctx: &mut Ctx<A, B>, base: A) -> Self {
+    pub fn new_base<S, N: Approx<A, B, S>>(ctx: &mut Ctx<A, B, S, N>, base: A) -> Self {
         Node {
             depth: 0,
             compr: ctx.compress_base(base),
@@ -67,7 +72,7 @@ impl<A: Embed, B: Embed> Node<A, B> {
         }
     }
 
-    pub fn new_node(ctx: &mut Ctx<A, B>, children: [Node<A, B>;4]) -> Self {
+    pub fn new_node<S, N: Approx<A, B, S>>(ctx: &mut Ctx<A, B, S, N>, children: [Node<A, B>;4]) -> Self {
         // Make sure the depths check out
         assert_eq!(children[0].depth, children[1].depth);
         assert_eq!(children[1].depth, children[2].depth);
@@ -88,8 +93,8 @@ impl<A: Embed, B: Embed> Node<A, B> {
         }
     }
 
-    fn build_square(
-        ctx: &mut Ctx<A, B>,
+    fn build_square<S, N: Approx<A, B, S>>(
+        ctx: &mut Ctx<A, B, S, N>,
         square: &[A],
         abs_size: usize,
         depth: usize,
@@ -106,16 +111,17 @@ impl<A: Embed, B: Embed> Node<A, B> {
             let half = size / 2;
             // in a z-like pattern
             let children = [
-                Self::build_square(ctx, square, abs_size, depth - 1, x + half, y       ),
                 Self::build_square(ctx, square, abs_size, depth - 1, x       , y       ),
-                Self::build_square(ctx, square, abs_size, depth - 1, x + half, y + half),
+                Self::build_square(ctx, square, abs_size, depth - 1, x + half, y       ),
                 Self::build_square(ctx, square, abs_size, depth - 1, x       , y + half),
+                Self::build_square(ctx, square, abs_size, depth - 1, x + half, y + half),
+
             ];
             Self::new_node(ctx, children)
         }
     }
 
-    pub fn new_from_square(ctx: &mut Ctx<A, B>, square: Vec<A>) -> Self {
+    pub fn new_from_square<S, N: Approx<A, B, S>>(ctx: &mut Ctx<A, B, S, N>, square: Vec<A>) -> Self {
         // get the side length, ensure this is a pow2 square
         let area = square.len();
         let size = ((area as f64).sqrt() + 0.5) as usize;
@@ -135,7 +141,7 @@ impl<A: Embed, B: Embed> Node<A, B> {
 
     /// Creates a new node double the size by centering the current node
     /// on a node double the size.
-    pub fn pad_empty(self, ctx: &mut Ctx<A, B>) -> Self {
+    pub fn pad_empty<S, N: Approx<A, B, S>>(self, ctx: &mut Ctx<A, B, S, N>) -> Self {
         todo!()
     }
 }

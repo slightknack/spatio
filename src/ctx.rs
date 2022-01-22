@@ -1,32 +1,74 @@
 use std::marker::PhantomData;
 use crate::quad::{Quad, Node, Embed};
 
-/// Represents a context with shared state.
-#[derive(Default, Debug)]
-pub struct Ctx<A: Embed, B: Embed> {
-    _phantom_a: PhantomData<A>,
-    _phantom_b: PhantomData<B>,
+pub trait Approx<A: Embed, B: Embed, S>: Default {
+    fn color_base(state: &mut S, base: A) -> [u8; 4];
+
+    fn compress_node(state: &mut S, compr: [B; 4]) -> B;
+    fn   expand_node(state: &mut S, compr: B) -> [B; 4];
+
+    fn compress_base(state: &mut S, embed: A) -> B;
+    fn   expand_base(state: &mut S, compr: B) -> A;
 }
 
-impl<A: Embed, B: Embed> Ctx<A, B> {
-    /// Creates a new uninitialized context.
-    pub fn new_empty() -> Self {
-        Default::default()
+#[derive(Default)]
+pub struct Basic;
+
+impl Approx<u8, u8, ()> for Basic {
+    fn color_base(state: &mut (), base: u8) -> [u8; 4] {
+        [base;4]
     }
 
-    /// Combines 4 child node representations into a single representation
-    /// Using a neural network.
-    pub fn combine(&mut self, compr: [B; 4]) -> B {
-        todo!("Build new B from 4 child B");
+    fn compress_node(state: &mut (), c: [u8; 4]) -> u8 {
+        c[0]/4 + c[1]/4 + c[2]/4 + c[3]/4
+    }
+
+    fn expand_node(state: &mut (), compr: u8) -> [u8; 4] {
+        [compr;4]
+    }
+
+    fn compress_base(state: &mut (), embed: u8) -> u8 {
+        embed
+    }
+
+    fn expand_base(state: &mut (), compr: u8) -> u8 {
+        compr
+    }
+}
+
+/// Represents a context with shared state.
+#[derive(Debug)]
+pub struct Ctx<A: Embed, B: Embed, S, N: Approx<A, B, S>> {
+    _phantom_a: PhantomData<A>,
+    _phantom_b: PhantomData<B>,
+    state:    S,
+    networks: N,
+}
+
+impl<A: Embed, B: Embed, S, N: Approx<A, B, S>> Ctx<A, B, S, N> {
+    /// Creates a new uninitialized context.
+    pub fn new(state: S, networks: N) -> Self {
+        Ctx {
+            _phantom_a: PhantomData,
+            _phantom_b: PhantomData,
+            state,
+            networks,
+        }
+    }
+
+    pub fn color_base(&mut self, base: A) -> [u8; 4] {
+        N::color_base(&mut self.state, base)
     }
 
     /// Compresses a base-level cell into a vector.
     pub fn compress_base(&mut self, base: A) -> B {
-        todo!("Turn Base Cell into a vector B");
+        N::compress_base(&mut self.state, base)
     }
 
-    pub fn color_base(&mut self, base: &A) -> [u8; 4] {
-        todo!();
+    /// Combines 4 child node representations into a single representation
+    /// Using a neural network.
+    pub fn compress_node(&mut self, compr: [B; 4]) -> B {
+        N::compress_node(&mut self.state, compr)
     }
 
     /// Compresses a single node into a vector representation.
@@ -36,7 +78,7 @@ impl<A: Embed, B: Embed> Ctx<A, B> {
         match quad {
             Quad::Base(b) => Some(self.compress_base(*b)),
             Quad::Node(n) => Some(
-                self.combine([
+                self.compress_node([
                     n[0].compr,
                     n[1].compr,
                     n[2].compr,
@@ -48,12 +90,12 @@ impl<A: Embed, B: Embed> Ctx<A, B> {
     }
 
     /// Compresses a base-level cell into a vector.
-    fn expand_base(&mut self, compr: B) -> A {
-        todo!("Turn compressed B into the A that made it");
+    pub fn expand_base(&mut self, compr: B) -> A {
+        N::expand_base(&mut self.state, compr)
     }
 
-    fn expand_node(&mut self, compr: B) -> [B; 4] {
-        todo!("Turn compressed B into 4 child B that made it");
+    pub fn expand_node(&mut self, compr: B) -> [B; 4] {
+        N::expand_node(&mut self.state, compr)
     }
 
     /// Expands the compressed representation of a node into a node with 4 children.
