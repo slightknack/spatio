@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 miniquad = "0.2.55"
+tch = "0.6.1"
